@@ -1,11 +1,11 @@
 import cv2
 import sys, os
-import numpy as np 
+import numpy as np
 import pandas as pd
 from PIL import Image
 import pydaisi as pyd
 import streamlit as st
-from constants import * 
+from constants import *
 
 from utils.general_util import get_template
 from utils.validation_utils import is_empty, check_valid_micr, get_digits, get_alnum
@@ -31,7 +31,7 @@ DIR = os.path.dirname(__file__)
 def crop_to_cheque(img, send_steps=False):
     """
     Crops the image to the cheque.
-    
+
     Parameters
     ----------
     img : numpy.ndarray
@@ -39,7 +39,7 @@ def crop_to_cheque(img, send_steps=False):
     send_steps : bool, optional
         Whether to return the intermediate steps of the cropping process.
         The default is False.
-    
+
     Returns
     -------
     numpy.ndarray
@@ -50,17 +50,17 @@ def crop_to_cheque(img, send_steps=False):
     """
     return autoCrop.autocrop(img, send_steps=send_steps)
 
-@st.experimental_memo
+@st.cache_data
 def clean_cheque(img):
     """
     This function takes an image containing a cheque and performs binarization
     and cleaning operations for further processing.
-    
+
     Parameters
     ----------
     img : numpy.ndarray
         An image containing the cheque
-        
+
     Returns
     -------
     numpy.ndarray
@@ -70,18 +70,18 @@ def clean_cheque(img):
     processed_img = preprocessor.auto_preprocess()
     return processed_img
 
-@st.experimental_memo
+@st.cache_data
 def segment_cheque(img, segmentation_template=None):
     """
     Segments the given image using the segmentation template
-    
+
     Parameters
     ----------
     img: numpy.ndarray
         Image to be segmented
-    segmentation_template: 
+    segmentation_template:
         The template used for segmentation
-        
+
     Returns
     -------
     numpy.ndarray
@@ -91,7 +91,7 @@ def segment_cheque(img, segmentation_template=None):
     segmentation_result = segmentor.auto_segmentation()
     return segmentation_result
 
-@st.experimental_memo
+@st.cache_data
 def azure_cheque_ocr(img, segmentation_template=None):
     """
     This function takes an image of a cheque and returns a dictionary of the
@@ -113,11 +113,11 @@ def azure_cheque_ocr(img, segmentation_template=None):
     azure_ocr = AzureOCR()
     return azure_ocr.process_cheque_image(img, segmentation_template=segmentation_template)
 
-@st.experimental_memo
+@st.cache_data
 def extraction_result_sanitizer(cheque_extraction_result):
     """
     This function takes the result of the cheque extraction as input and returns a sanitized version of the same.
-    
+
     Parameters
     ----------
     cheque_extraction_result : dict
@@ -126,7 +126,7 @@ def extraction_result_sanitizer(cheque_extraction_result):
     Returns
     -------
     sanitized_result : dict
-        A dictionary containing the relevant fields from the cheque extraction 
+        A dictionary containing the relevant fields from the cheque extraction
         result if the fields are valid or None for the fields that are invalid.
     """
     sanitized_result = {}
@@ -138,10 +138,10 @@ def extraction_result_sanitizer(cheque_extraction_result):
         for field in cheque_extraction_result["micr_strip"]:
             field = field.replace(" ", "")
             if check_valid_micr(field):
-                sanitized_result["micr_strip"] = field  
+                sanitized_result["micr_strip"] = field
                 break
         if "micr_strip" not in sanitized_result:
-            sanitized_result["micr_strip"] = None         
+            sanitized_result["micr_strip"] = None
     else:
         sanitized_result["micr_strip"] = None
 
@@ -188,7 +188,7 @@ def extraction_result_sanitizer(cheque_extraction_result):
          for field in cheque_extraction_result["legal_amount_line_2"]:
             closest_match = legal_amount_corrector.get_closest_match(field)
             if not is_empty(closest_match):
-                legal_amount_string += " " + closest_match 
+                legal_amount_string += " " + closest_match
 
     if not is_empty(legal_amount_string):
         sanitized_result["legal_amount"] = legal_amount_string[1:].capitalize()
@@ -202,7 +202,7 @@ def extraction_result_sanitizer(cheque_extraction_result):
                 sanitized_result["IFSC_code"] = t_detail.replace("ifsc", "").upper()
     else:
         sanitized_result["IFSC_code"] = None
-    
+
 
     if not is_empty(cheque_extraction_result["date_box"]):
         date_string = ''.join([get_digits(date_field) for date_field in cheque_extraction_result["date_box"]])
@@ -215,18 +215,18 @@ def extraction_result_sanitizer(cheque_extraction_result):
         sanitized_result["date_box"] = None
     return sanitized_result
 
-@st.experimental_memo
+@st.cache_data
 def get_df_from_result(result):
     """
     This function takes a dictionary as input and returns a pandas dataframe.
     The keys of the input dictionary are used as the index of the dataframe.
     The values of the input dictionary are used as the data of the dataframe.
-    
+
     Parameters
     ----------
     result : dict
         A dictionary
-        
+
     Returns
     -------
     df : pandas.DataFrame
@@ -240,7 +240,7 @@ def get_df_from_result(result):
     df = pd.DataFrame({"Keys": keys, "Data": data})
     return df
 
-@st.experimental_memo
+@st.cache_data
 def signature_cleaner(signatures):
     """
     This function takes in a list of signatures, or a single signature and
@@ -252,7 +252,7 @@ def signature_cleaner(signatures):
         If a list is received, it is first sanitized and normalized, and output is
         returned for each signature. If a single signature is received, there is no
         sanitization step, and the signature is normalized before output.
-    
+
     Returns
     -------
     list<np.ndarray>
@@ -260,37 +260,37 @@ def signature_cleaner(signatures):
     """
     #return signature_verification_toolkit.signature_cleaner(signatures).value
 
-@st.experimental_memo
+@st.cache_data
 def verify_signatures(sig1_np, sig2_np):
     """
     Verify two signatures for match
-    
+
     Parameters
     ----------
     sig1_np : numpy.ndarray
         The first signature.
     sig2_np : numpy.ndarray
         The second signature.
-    
+
     Returns
     -------
-    dict 
+    dict
         A dictionary with two keys:
         - cosine_distance: the cosine distance between the two signatures
         - is_match: a boolean indicating whether the two signatures are a match or not
     """
     #return signature_verification_toolkit.verify_signatures(sig1_np, sig2_np).value
 
-@st.experimental_memo
+@st.cache_data
 def cheque_verification_pipeline(cheque_image, bank_name=None, segmentation_template=None, required_segments=None):
     """
     Verify two signatures for match
-    
+
     Parameters
     ----------
     cheque_image: numpy.ndarray
         Image of the cheque
-        
+
     bank_name: str
         Name of the bank whose cheque this image is of. Currently supported
         banks are "axis", "icici", "syndicate", "CTS-2010" (Default template)
@@ -304,7 +304,7 @@ def cheque_verification_pipeline(cheque_image, bank_name=None, segmentation_temp
         A list of the names of the segments to be extracted from the segmentation_result
         dictionary. If None, all the segments in the segmentation_result dictionary
         will be extracted in a new dictionary
-    
+
     Returns
     -------
     raw_extraction_result: dict
@@ -325,7 +325,7 @@ def cheque_verification_pipeline(cheque_image, bank_name=None, segmentation_temp
     segmentation_result = segment_cheque(cleaned_img, segmentation_template=segmentation_template)
     raw_extraction_result = azure_cheque_ocr(cleaned_img, segmentation_template=segmentation_template)
     sanitized_result = extraction_result_sanitizer(raw_extraction_result)
-    
+
     if required_segments is None:
         segments = segmentation_result
     else:
@@ -333,23 +333,23 @@ def cheque_verification_pipeline(cheque_image, bank_name=None, segmentation_temp
 
     return raw_extraction_result, sanitized_result, segments
 
-def st_ui():
-    # st.title('Automatic Cheque Clearing System 🤖')
-    st.markdown("""
+def render_header():
+    st.markdown('''
             <div align="center">
                 <h2> Welcome to the <br> Automatic Cheque Clearing System by Abhay Shukla🤖</h2>
             </div>
-                """, unsafe_allow_html=True)
-    st.write("""
+                ''', unsafe_allow_html=True)
+    st.write('''
         ***
         In spite of the overall rapid emergence of electronic payments, huge volumes of handwritten bank cheques are issued and processed manually every day.
-        
-        
-        The Automatic Cheque Clearing System leverages **AI fuelled** technology along with rich **rule-based** automations to organize and streamline cheque clearance.
-        
-        ***
-        """)
 
+
+        The Automatic Cheque Clearing System leverages **AI fuelled** technology along with rich **rule-based** automations to organize and streamline cheque clearance.
+
+        ***
+        ''')
+
+def render_sidebar():
     st.sidebar.markdown("# Control Panel ⚙️")
     st.sidebar.markdown("***")
     demo_type = st.sidebar.radio("Select the Demonstration ✨", ["File Upload"])
@@ -365,87 +365,95 @@ def st_ui():
         cheque_template_name = st.sidebar.selectbox("Choose the cheque template 🧾", cheque_templates_dict.keys())
         cheque_template_path = cheque_templates_dict[cheque_template_name]
     else:
-
-
         document_selector = 0
-        
+        cheque_image = None
+        cheque_template_path = None
+
+    return cheque_image, cheque_template_path
+
+def process_verification(raw_image, cheque_template):
+    st.markdown("#### Crop and Skew Removal")
+    cropped_img, image_blurred, edges, image_cnt = crop_to_cheque(raw_image, send_steps=True)
+    st.image(cropped_img, "Crop and Skew Removal")
+    with st.expander("Note", expanded=False):
+        st.write("Take a look at the steps behind this process...")
+        crop_note_col1, crop_note_col2 = st.columns(2)
+        crop_note_col1.image(image_blurred, "Median Blur")
+        crop_note_col2.image(edges, "Canny Edge Detection")
+        crop_note_col1.image(image_cnt, "Contour Detection")
+        crop_note_col2.image(cropped_img, "Four Point Transform")
+
+    st.markdown("### Cleaning and Binarization")
+    cleaned_img = clean_cheque(cropped_img)
+    st.image(cleaned_img, "Cleaning and Binarization")
+
+    st.markdown("#### Segmentation")
+    with st.expander("Segments", expanded=True):
+        segmentation_result = segment_cheque(cleaned_img, segmentation_template=cheque_template)
+        for key, segment in segmentation_result.items():
+            col1, col2 = st.columns(2)
+            col1.markdown("**%s**" % (key))
+            with col2:
+                st.image(segment)
+
+    st.markdown("#### Raw Extracted Information")
+    with st.spinner("Extracting Text..."):
+        raw_extraction_result = azure_cheque_ocr(cleaned_img, segmentation_template=cheque_template)
+    sanitized_result = extraction_result_sanitizer(raw_extraction_result)
+    with st.expander("Result", expanded=False):
+        st.json(raw_extraction_result)
+
+    st.markdown("#### Sanitized Extracted Information")
+    df = get_df_from_result(sanitized_result)
+    st.dataframe(df, use_container_width=True)
+    with st.expander("Note", expanded=False):
+        st.write('''
+            To increase the robustness of text recognition for the legal amount, a sentence
+            segmentation and fuzzy search correction algorithm has been implemented.
+        ''')
+
+    st.markdown("#### Signature Verification")
+    orig_sign_np = cv2.imread(os.path.join(DIR, r'./images/original_sign.png'))
+    check_sign_np = segmentation_result['sign_area']
+
+    with st.expander("Verification", expanded=True):
+        col1, col2 = st.columns(2)
+        col1.image(orig_sign_np, "Original Signature")
+        col2.image(check_sign_np, "Sign to be verified")
+
+    with st.spinner("Cleaning Signatures..."):
+        cleaned_orig_sign, cleaned_check_sign = signature_cleaner([orig_sign_np, check_sign_np])
+
+    with st.expander("Cleaned Signatures", expanded=True):
+        col1, col2 = st.columns(2)
+        col1.image(cleaned_orig_sign, "Original Signature")
+        col2.image(cleaned_check_sign, "Sign to be verified")
+
+    with st.spinner("Verifying Authenticity..."):
+        verification_result = verify_signatures(orig_sign_np, check_sign_np)
+
+    st.markdown("##### Verification Result")
+    st.json(verification_result, expanded=False)
+
+def st_ui():
+    render_header()
+    cheque_image, cheque_template_path = render_sidebar()
+
     if cheque_image is None:
         st.sidebar.markdown("***")
         return
-    
+
     raw_image = Image.open(cheque_image)
     cheque_template = get_template(cheque_template_path)
     raw_image = np.array(raw_image)
     st.markdown("#### Input Cheque")
     st.image(raw_image, "Input Cheque")
-    
+
     if st.sidebar.button("Verify"):
-        
-        st.markdown("#### Crop and Skew Removal")
-        cropped_img, image_blurred, edges, image_cnt = crop_to_cheque(raw_image, send_steps=True)
-        st.image(cropped_img, "Crop and Skew Removal")
-        with st.expander("Note", expanded=False):
-            st.write("Take a look at the steps behind this process...")
-            crop_note_col1, crop_note_col2 = st.columns(2)
-            crop_note_col1.image(image_blurred, "Median Blur")
-            crop_note_col2.image(edges, "Canny Edge Detection")
-            crop_note_col1.image(image_cnt, "Contour Detection")
-            crop_note_col2.image(cropped_img, "Four Point Transform")
+        process_verification(raw_image, cheque_template)
 
-        st.markdown("### Cleaning and Binarization")
-        cleaned_img = clean_cheque(cropped_img)
-        st.image(cleaned_img, "Cleaning and Binarization")
-
-        st.markdown("#### Segmentation")
-        with st.expander("Segments", expanded=True):
-            segmentation_result = segment_cheque(cleaned_img, segmentation_template=cheque_template)
-            for key, segment in segmentation_result.items():
-                col1, col2 = st.columns(2)
-                col1.markdown("**%s**" % (key))
-                with col2:
-                    st.image(segment)
-
-        st.markdown("#### Raw Extracted Information")
-        with st.spinner("Extracting Text..."):
-            raw_extraction_result = azure_cheque_ocr(cleaned_img, segmentation_template=cheque_template)
-        sanitized_result = extraction_result_sanitizer(raw_extraction_result)
-        with st.expander("Result", expanded=False):
-            st.json(raw_extraction_result)
-        
-        st.markdown("#### Sanitized Extracted Information")
-        df = get_df_from_result(sanitized_result)
-        st.dataframe(df, use_container_width=True)
-        with st.expander("Note", expanded=False):
-            st.write("""
-                To increase the robustness of text recognition for the legal amount, a sentence 
-                segmentation and fuzzy search correction algorithm has been implemented.
-            """)
-
-        st.markdown("#### Signature Verification")
-        orig_sign_np = cv2.imread(os.path.join(DIR, r'./images/original_sign.png'))
-        check_sign_np = segmentation_result['sign_area']
-
-
-        with st.expander("Verification", expanded=True):    
-            col1, col2 = st.columns(2)
-            col1.image(orig_sign_np, "Original Signature")
-            col2.image(check_sign_np, "Sign to be verified")   
-
-        with st.spinner("Cleaning Signatures..."):
-            cleaned_orig_sign, cleaned_check_sign = signature_cleaner([orig_sign_np, check_sign_np])
-
-        with st.expander("Cleaned Signatures", expanded=True):
-            col1, col2 = st.columns(2)
-            col1.image(cleaned_orig_sign, "Original Signature")
-            col2.image(cleaned_check_sign, "Sign to be verified")
-
-        with st.spinner("Verifying Authenticity..."):
-            verification_result = verify_signatures(orig_sign_np, check_sign_np)
-        
-        st.markdown("##### Verification Result")
-        st.json(verification_result, expanded=False)
-    
     st.sidebar.markdown("***")
+
 
 if __name__ == "__main__":
     st_ui()
