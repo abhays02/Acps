@@ -20,12 +20,15 @@ from msrest.authentication import CognitiveServicesCredentials
 Authenticate
 Authenticates your credentials and creates a client.
 '''
-subscription_key = os.getenv('3278ad5680184ff2802a87a128681064')
-endpoint = os.getenv('https://freeacp.cognitiveservices.azure.com/')
+subscription_key = os.getenv('AZURE_SUBSCRIPTION_KEY')
+endpoint = os.getenv('AZURE_ENDPOINT')
+
+if not subscription_key or not endpoint:
+    raise ValueError("AZURE_SUBSCRIPTION_KEY and AZURE_ENDPOINT environment variables must be set.")
 
 class AzureOCR():
     def __init__(self):
-        self.computervision_client = ComputerVisionClient('https://freeacp.cognitiveservices.azure.com/', CognitiveServicesCredentials('3278ad5680184ff2802a87a128681064'))
+        self.computervision_client = ComputerVisionClient(endpoint, CognitiveServicesCredentials(subscription_key))
 
     def recognize_text(self, read_image):
         """RecognizeTextUsingRecognizeAPI.
