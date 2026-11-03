@@ -70,9 +70,9 @@ class AzureOCR():
     def get_roi_key(self, azure_segment_box, cheque_areas):
         max_iou = 0
         best_area = None
+        poly_1 = Polygon(azure_segment_box)
 
         for key, cheque_segment_box in cheque_areas.items():
-            poly_1 = Polygon(azure_segment_box)
             poly_2 = Polygon(cheque_segment_box)
 
             iou = poly_1.intersection(poly_2).area / min(poly_1.area, poly_2.area)
